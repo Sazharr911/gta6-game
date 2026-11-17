@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PALMSHADE HEAT — Port Palmshade</title>
+<style>
+  :root {
+    --gold: #ffd23e;
+    --ink: rgba(10, 13, 18, 0.78);
+    --ink-soft: rgba(10, 13, 18, 0.62);
+    --paper: #f4efe2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d141b;
+    font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+    color: var(--paper);
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  #stage {
+    position: relative;
+    width: min(1280px, 100vw);
+    user-select: none;
+  }
+  canvas#game {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #1d5f7a;
+  }
+  .panel {
+    position: absolute;
+    background: var(--ink);
+    border-left: 3px solid var(--gold);
+    padding: 8px 12px;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+  }
+  /* top-left district plate */
+  #plate { top: 14px; left: 14px; min-width: 210px; }
+  #plate-district { font-size: 19px; font-weight: 800; letter-spacing: 1.5px; }
+  #plate-tag { font-size: 9.5px; letter-spacing: 1.6px; color: rgba(244,239,226,0.75); margin-top: 2px; }
+  #plate-clock { font-size: 10.5px; letter-spacing: 1.2px; color: var(--gold); margin-top: 5px; font-weight: 700; }
+  /* top-centre mission banner */
+  #banner {
+    top: 14px; left: 50%; transform: translateX(-50%);
+    text-align: center; border-left: none; border-top: 3px solid var(--gold);
+    max-width: 520px; background: var(--ink-soft);
+  }
+  #banner-title { font-size: 14.5px; font-weight: 800; letter-spacing: 0.8px; }
+  #banner-sub { font-size: 11px; color: rgba(244,239,226,0.8); margin-top: 2px; }
+  /* top-right vitals */
+  #wallet { top: 14px; right: 14px; text-align: right; border-left: none; border-right: 3px solid var(--gold); min-width: 170px; }
+  #hud-cash { font-size: 23px; font-weight: 800; color: #7dd87d; }
+  #hud-stars { font-size: 17px; color: var(--gold); letter-spacing: 3px; margin-top: 1px; }
+  #hud-searching { font-size: 9px; letter-spacing: 1.6px; color: #ff9a5c; font-weight: 700; min-height: 11px; }
+  #hud-weapon { font-size: 11.5px; font-weight: 700; letter-spacing: 1px; margin-top: 3px; }
+  /* bottom-left minimap + bars */
+  #mapbox { position: absolute; left: 14px; bottom: 14px; pointer-events: none; }
+  #minimap { display: block; }
+  #bars { margin-top: 7px; width: 168px; }
+  .bar-label { font-size: 8.5px; letter-spacing: 1.6px; color: rgba(244,239,226,0.8); margin: 4px 0 2px; }
+  .bar { height: 7px; background: rgba(255,255,255,0.16); }
+  .bar > div { height: 100%; transition: width 0.15s linear; }
+  #bar-health-fill { background: #58c96b; width: 100%; }
+  #bar-armour-fill { background: #5d8fd6; width: 0%; }
+  #hud-respect { font-size: 9.5px; letter-spacing: 1.2px; margin-top: 6px; color: var(--paper); background: var(--ink-soft); padding: 3px 6px; display: inline-block; }
+  /* bottom-centre dialogue + radio + prompt */
+  #dialogue {
+    position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%);
+    width: min(620px, 62%); background: var(--ink); padding: 10px 14px;
+    font-size: 14.5px; line-height: 1.35; display: none; pointer-events: none;
+  }
+  #dialogue.show { display: block; }
+  #dialogue-who { color: var(--gold); font-weight: 800; margin-right: 6px; }
+  #radio-line {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: var(--ink-soft); padding: 5px 12px; font-size: 10.5px;
+    letter-spacing: 1.4px; display: none; pointer-events: none; white-space: nowrap;
+  }
+  #radio-line.show { display: block; }
+  #prompt {
+    position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%);
+    background: rgba(255,210,62,0.92); color: #221a05; font-weight: 800;
+    font-size: 12.5px; letter-spacing: 0.8px; padding: 5px 12px; display: none;
+    pointer-events: none; white-space: nowrap;
+  }
+  #prompt.show { display: block; }
+  /* bottom-right speedometer */
+  #speedo-wrap { position: absolute; right: 14px; bottom: 14px; display: none; pointer-events: none; }
+  #speedo-wrap.show { display: block; }
+  /* toast + bust + splash */
+  #toast {
+    position: absolute; top: 92px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); border: 1px solid var(--gold); color: var(--paper);
+    padding: 7px 16px; font-size: 13px; font-weight: 700; letter-spacing: 0.8px;
+    opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+  #bust-wrap {
+    position: absolute; top: 140px; left: 50%; transform: translateX(-50%);
+    width: 260px; display: none; pointer-events: none; text-align: center;
+  }
+  #bust-wrap.show { display: block; }
+  #bust-wrap .bar-label { color: #ff6b5c; font-weight: 800; font-size: 10px; }
+  #bust-track { height: 9px; background: rgba(255,255,255,0.2); }
+  #bust-fill { height: 100%; background: #ff3b30; width: 0%; }
+  #splash {
+    position: absolute; inset: 0; display: none; align-items: center;
+    justify-content: center; flex-direction: column; pointer-events: none;
+    background: rgba(5, 8, 12, 0.35);
+  }
+  #splash.show { display: flex; }
+  #splash-title { font-size: 64px; font-weight: 900; letter-spacing: 8px; text-shadow: 0 4px 22px rgba(0,0,0,0.7); }
+  #splash-sub { font-size: 15px; margin-top: 8px; letter-spacing: 1px; }
+  /* overlays */
+  .overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(180deg, rgba(8,14,22,0.25), rgba(8,14,22,0.72));
+    z-index: 5;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 { font-size: 58px; font-weight: 900; letter-spacing: 6px; color: #fff; text-shadow: 0 4px 26px rgba(0,0,0,0.8); }
+  .overlay h1 span { color: var(--gold); }
+  .overlay h2 { font-size: 30px; font-weight: 900; letter-spacing: 4px; color: #fff; }
+  .overlay p.tagline { letter-spacing: 3px; font-size: 12px; color: var(--gold); margin: 8px 0 4px; font-weight: 700; }
+  .overlay p.story { max-width: 520px; font-size: 13.5px; line-height: 1.5; color: rgba(244,239,226,0.92); margin-bottom: 22px; }
+  .menu-btn {
+    pointer-events: auto; cursor: pointer; display: block; width: 250px;
+    margin: 5px auto; padding: 11px 0; font-size: 15px; font-weight: 800;
+    letter-spacing: 2px; color: #221a05; background: var(--gold);
+    border: none; text-transform: uppercase;
+  }
+  .menu-btn.secondary { background: rgba(244,239,226,0.16); color: var(--paper); border: 1px solid rgba(244,239,226,0.5); }
+  .menu-btn:disabled { opacity: 0.35; cursor: default; }
+  .menu-btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .controls { text-align: left; font-size: 13px; line-height: 1.9; background: var(--ink); padding: 14px 22px; margin-bottom: 18px; }
+  .controls b { color: var(--gold); display: inline-block; min-width: 118px; letter-spacing: 0.6px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="800"></canvas>
+
+  <div id="plate" class="panel">
+    <div id="plate-district">PALMLINE BEACH</div>
+    <div id="plate-tag">SUN, SAND AND BAD DECISIONS</div>
+    <div id="plate-clock">DAY 1 · 10:15 · CLEAR &amp; HOT</div>
+  </div>
+
+  <div id="banner" class="panel">
+    <div id="banner-title">FREE ROAM · PORT PALMSHADE</div>
+    <div id="banner-sub"></div>
+  </div>
+
+  <div id="wallet" class="panel">
+    <div id="hud-cash">$250</div>
+    <div id="hud-stars">☆☆☆☆☆</div>
+    <div id="hud-searching"></div>
+    <div id="hud-weapon">FISTS ∞</div>
+  </div>
+
+  <div id="mapbox">
+    <canvas id="minimap" width="168" height="168"></canvas>
+    <div id="bars">
+      <div class="bar-label">HEALTH</div>
+      <div class="bar"><div id="bar-health-fill"></div></div>
+      <div class="bar-label">ARMOUR</div>
+      <div class="bar"><div id="bar-armour-fill"></div></div>
+      <div id="hud-respect">RESPECT · LV 1 · 0 JOBS DONE</div>
+    </div>
+  </div>
+
+  <div id="dialogue"><span id="dialogue-who">SOL:</span><span id="dialogue-text"></span></div>
+  <div id="prompt"></div>
+  <div id="radio-line"></div>
+
+  <div id="speedo-wrap"><canvas id="speedo" width="150" height="150"></canvas></div>
+
+  <div id="toast"></div>
+  <div id="bust-wrap">
+    <div class="bar-label">PSPD MAKING THE ARREST</div>
+    <div id="bust-track"><div id="bust-fill"></div></div>
+  </div>
+  <div id="splash">
+    <div id="splash-title">BUSTED</div>
+    <div id="splash-sub"></div>
+  </div>
+
+  <div id="title-screen" class="overlay">
+    <p class="tagline">PORT PALMSHADE · EST. 1911</p>
+    <h1>PALMSHADE <span>HEAT</span></h1>
+    <p class="story">Rio Calloway, wheelman for hire, fresh off the bus with $250 and a borrowed
+      roof. Fixer Marisol “Sol” Vega runs the jobs; the Palmshade PD runs the sirens.
+      Six chapters, one city, every car a temptation.</p>
+    <button id="btn-new" class="menu-btn">New Game</button>
+    <button id="btn-continue" class="menu-btn secondary">Continue</button>
+    <button id="btn-how" class="menu-btn secondary">How to Play</button>
+  </div>
+
+  <div id="howto-screen" class="overlay hidden">
+    <h2>HOW TO PLAY</h2>
+    <div class="controls">
+      <div><b>WASD / Arrows</b> Walk · drive</div>
+      <div><b>Mouse</b> Aim</div>
+      <div><b>Left mouse</b> Punch · shoot</div>
+      <div><b>E</b> Enter / steal car · take job · repair · supplies</div>
+      <div><b>F</b> Buy the Hornet SMG · start a marina race</div>
+      <div><b>Shift</b> Sprint · handbrake</div>
+      <div><b>1 / 2 / 3</b> Fists · Palm-9 · Hornet SMG</div>
+      <div><b>R</b> Radio station (in a car)</div>
+      <div><b>M</b> Save at the Palmline Safehouse</div>
+      <div><b>P / Esc</b> Pause (S saves, Q quits)</div>
+    </div>
+    <p class="story">Crimes only heat you up when somebody sees them. Break line of sight,
+      let the stars cool, and never let an officer stand close for long.</p>
+    <button id="btn-back" class="menu-btn">Back</button>
+  </div>
+
+  <div id="pause-menu" class="overlay hidden">
+    <h2>PAUSED</h2>
+    <p class="story">The city holds its breath.</p>
+    <button id="btn-resume" class="menu-btn">Resume</button>
+    <button id="btn-quit" class="menu-btn secondary">Quit to Title</button>
+    <p class="story" style="margin-top:14px">Press S to save · progress also saves after every job</p>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
